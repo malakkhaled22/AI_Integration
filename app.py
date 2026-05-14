@@ -4,8 +4,8 @@ import pandas as pd
 
 app = FastAPI()
 
-model = joblib.load("model(1).pkl")
-features = joblib.load("features(1).pkl")
+model = joblib.load("model.pkl")
+features = joblib.load("features.pkl")
 sub_area_map = joblib.load("sub_area_freq_map.pkl")
 
 def norm(x):
@@ -20,12 +20,16 @@ def predict(data: dict):
     size = float(data.get("Size_sqm", 0))
     bedrooms = float(data.get("Bedroom_Num", 0))
     bathrooms = float(data.get("bathrooms_numeric", 0))
+    is_actually_cash = float(data.get("is_cash", 0))
 
+    df.at[0, "is_cash"] = 1.0
+
+    df.at[0, "payment_factor"] = 1.0
     df.at[0, "Size_sqm"] = size
     df.at[0, "Bedroom_Num"] = bedrooms
     df.at[0, "bathrooms_numeric"] = bathrooms
     df.at[0, "is_land"] = float(data.get("is_land", 0))
-    df.at[0, "is_cash"] = float(data.get("is_cash", 0))
+    
     df.at[0, "has_bedrooms"] = 1.0 if bedrooms > 0 else 0.0
     df.at[0, "has_bathrooms"] = 1.0 if bathrooms > 0 else 0.0
     
@@ -46,7 +50,7 @@ def predict(data: dict):
     if f"type_{property_type}" in df.columns:
         df.at[0, f"type_{property_type}"] = 1.0
 
-    # 6. تردد المنطقة (Sub Area Frequency)
+    # 6. (Sub Area Frequency)
     sub_area = norm(data.get("sub_area", ""))
     df.at[0, "sub_area_freq"] = sub_area_map.get(sub_area, 0.0)
 
@@ -56,7 +60,8 @@ def predict(data: dict):
     print(active_features)
     # ---------------------------------------
 
-    # 7. التنبؤ بالسعر
     prediction = float(model.predict(df)[0])
-    
-    return {"predicted_price": prediction}
+    final_price = prediction
+    if is_actually_cash == 0:
+        final_price = prediction * 1.10
+    return {"predicted_price": final_price}
